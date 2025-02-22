@@ -3,8 +3,7 @@
 一個用於追蹤支出的 Telegram 機器人，支援多種報表和圖表，並且利用手機內建 AI 辨識保存收據。
 (所有code皆為cursor ai產生)
 
-![Pie Chart](./image/pie-chart.jpg)
-![Bar Chart](./image/bar-chart.jpg)
+![Screenshot](./image/screenshot.png)
 
 ## 功能
 
