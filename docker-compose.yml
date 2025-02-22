@@ -1,0 +1,18 @@
+services:
+  bot:
+    platform: linux/amd64
+    build: .
+    volumes:
+      - ./data:/usr/src/app/data
+      - ./src/config.js:/usr/src/app/src/config.js:ro
+      - ./logs:/usr/src/app/logs
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - TZ=America/Chicago
+      - DEBUG=bot:*
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

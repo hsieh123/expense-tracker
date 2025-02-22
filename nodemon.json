@@ -1,0 +1,14 @@
+{
+    "ignore": [
+        "data/*",
+        "*.log",
+        ".git",
+        "node_modules/*",
+        "src/tests/*"
+    ],
+    "watch": [
+        "src/"
+    ],
+    "ext": "js,json",
+    "exec": "node src/index.js"
+} 

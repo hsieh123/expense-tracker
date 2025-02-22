@@ -1,0 +1,30 @@
+{
+  "name": "expense-tracker-bot",
+  "version": "1.0.0",
+  "description": "Telegram expense tracking bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0",
+    "echarts": "^5.4.3",
+    "skia-canvas": "^1.0.1",
+    "node-schedule": "^2.1.1",
+    "uuid": "^9.0.1",
+    "glob": "^10.3.10",
+    "rimraf": "^5.0.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0 <22.0.0"
+  }
+}
