@@ -1,6 +1,9 @@
 # Expense Tracker Bot
 
-一個用於追蹤支出的 Telegram 機器人。
+一個用於追蹤支出的 Telegram 機器人，支援多種報表和圖表，並且利用手機內建 AI 辨識保存收據。
+
+![Pie Chart](./image/pie-chart.jpg)
+![Bar Chart](./image/bar-chart.jpg)
 
 ## 功能
 
@@ -24,14 +27,12 @@
 
 1. 將機器人添加到群組
 2. 發送 /start 或點擊主選單按鈕
-3. 選擇需要的功能：
+3. 複製 Prompt 並貼給手機 AI 提示要產生的 JSON 格式，並拍下收據給 AI 辨識。
+4. 將收據 JSON 分享給機器人，機器人會自動保存收據。
+5. 選擇需要的功能：
    - 查看支出報表
    - 新增收據
    - 刪除記錄
-
-## 開發者
-
-[Your Name]
 
 ## 授權
 

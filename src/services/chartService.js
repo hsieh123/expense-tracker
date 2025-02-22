@@ -4,20 +4,7 @@ const { Canvas } = require('skia-canvas');
 class ChartService {
     constructor(config) {
         this.config = config;
-        this.colors = [
-            '#FF6B6B',  // 鮮紅
-            '#4ECDC4',  // 青綠
-            '#FFD93D',  // 亮黃
-            '#6C5CE7',  // 深紫
-            '#A8E6CF',  // 淺綠
-            '#FF8B94',  // 粉紅
-            '#45B7D1',  // 天藍
-            '#FF9F40',  // 橙色
-            '#98ACFF',  // 淺紫
-            '#FF6B8B',  // 桃紅
-            '#63FF8F',  // 螢光綠
-            '#B197FC'   // 淡紫
-        ];
+        this.colors = this.config.CHART_COLORS.colors;
     }
 
     _createCanvas(width = 800, height = 800) {
@@ -28,24 +15,24 @@ class ChartService {
 
     _applyCommonConfig(option) {
         return {
-            backgroundColor: '#FFFFFF',
+            backgroundColor: this.config.CHART_COLORS.backgroundColor,
             textStyle: {
                 fontFamily: 'Arial, "Microsoft YaHei"',
                 fontSize: 14,
                 fontWeight: 'bold',
-                color: '#333333'
+                color: this.config.CHART_COLORS.textColor
             },
             title: {
                 textStyle: {
                     fontSize: 18,
                     fontWeight: 'bold',
-                    color: '#333333'
+                    color: this.config.CHART_COLORS.textColor
                 }
             },
             legend: {
                 textStyle: {
                     fontSize: 14,
-                    color: '#333333'
+                    color: this.config.CHART_COLORS.textColor
                 }
             },
             ...option
@@ -62,7 +49,10 @@ class ChartService {
                 formatter: '{b}: ${c} ({d}%)'
             },
             legend: {
-                bottom: 20
+                bottom: 20,
+                textStyle: {
+                    color: this.config.CHART_COLORS.textColor
+                }
             },
             series: [{
                 type: 'pie',
@@ -71,14 +61,14 @@ class ChartService {
                 avoidLabelOverlap: true,
                 itemStyle: {
                     borderRadius: 10,
-                    borderColor: '#FFFBF0',
+                    borderColor: this.config.CHART_COLORS.backgroundColor,
                     borderWidth: 2
                 },
                 label: {
                     show: true,
                     position: params => params.percent > 15 ? 'inside' : 'outside',
                     formatter: params => `${params.name}\n$${params.value.toFixed(2)}`,
-                    color: params => params.percent > 15 ? '#FFFFFF' : '#333333',
+                    color: params => params.percent > 15 ? '#FFFFFF' : this.config.CHART_COLORS.textColor,
                     fontSize: 16,
                     fontWeight: 'bold',
                     lineHeight: 20,
@@ -89,7 +79,7 @@ class ChartService {
                     length: 15,
                     length2: 25,
                     lineStyle: {
-                        color: '#333333',
+                        color: this.config.CHART_COLORS.textColor,
                         width: 2
                     }
                 },
@@ -128,7 +118,10 @@ class ChartService {
             },
             legend: {
                 data: categories,
-                top: 10
+                top: 10,
+                textStyle: {
+                    color: this.config.CHART_COLORS.textColor
+                }
             },
             grid: {
                 left: '3%',
@@ -143,7 +136,7 @@ class ChartService {
                     return `${month}/${day}`;
                 }),
                 axisLabel: {
-                    color: '#333333',
+                    color: this.config.CHART_COLORS.textColor,
                     fontSize: 12,
                     fontWeight: 'bold',
                     rotate: data.length > 15 ? 45 : 0
@@ -152,7 +145,7 @@ class ChartService {
             yAxis: {
                 type: 'value',
                 axisLabel: {
-                    color: '#333333',
+                    color: this.config.CHART_COLORS.textColor,
                     fontSize: 12,
                     fontWeight: 'bold',
                     formatter: '${value}'

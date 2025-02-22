@@ -1,0 +1,25 @@
+# Sensitive data
+src/config.js
+
+# Dependencies
+node_modules/
+
+# Data files
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 
