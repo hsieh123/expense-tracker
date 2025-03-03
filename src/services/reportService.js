@@ -196,23 +196,37 @@ class ReportService {
      * 生成週報表
      */
     async generateWeeklyReport(date) {
-        // 計算本週的起始日期（週一）
-        const startDate = new Date(date);
-        const day = startDate.getDay();
-        const diff = startDate.getDate() - day + (day === 0 ? -6 : 1); // 如果是週日，則往前推6天
-        startDate.setDate(diff);
+        // 使用當地時區（America/Chicago）設置日期範圍
+        const targetDate = new Date(date);
+        const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: this.config.TIME_ZONE }));
+        
+        // 設置結束日期為當地時間的 23:59:59.999
+        const endDate = new Date(localDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        // 設置開始日期為當地時間的 7 天前的 00:00:00
+        const startDate = new Date(localDate);
+        startDate.setDate(startDate.getDate() - 6); // 往前推6天（包含當天共7天）
+        startDate.setHours(0, 0, 0, 0);
 
-        // 計算本週的結束日期（週日）
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 6);
+        // 將時間轉換回 UTC 以便存儲查詢
+        const utcStartDate = new Date(startDate.toLocaleString('en-US', { timeZone: 'UTC' }));
+        const utcEndDate = new Date(endDate.toLocaleString('en-US', { timeZone: 'UTC' }));
 
         console.log('Weekly report date range:', {
-            start: startDate.toISOString(),
-            end: endDate.toISOString(),
-            originalDay: day
+            input: targetDate.toISOString(),
+            local: {
+                start: startDate.toLocaleString('en-US', { timeZone: this.config.TIME_ZONE }),
+                end: endDate.toLocaleString('en-US', { timeZone: this.config.TIME_ZONE })
+            },
+            utc: {
+                start: utcStartDate.toISOString(),
+                end: utcEndDate.toISOString()
+            },
+            description: '過去7天的消費'
         });
 
-        return this._generateReport(startDate, endDate, '週');
+        return this._generateReport(utcStartDate, utcEndDate, '週');
     }
 
     /**

@@ -318,23 +318,23 @@ class BotService {
 
     async handleDateInput(chatId, text) {
         try {
-            const inputDate = new Date(text);
-            if (isNaN(inputDate)) {
-                throw new Error('無效的日期格式');
+            // 解析用戶輸入的日期
+            const date = new Date(text);
+            
+            // 檢查日期是否有效
+            if (isNaN(date.getTime())) {
+                throw new Error('Invalid date');
             }
-
-            // 轉換為當地時區
-            const localDate = new Date(inputDate.toLocaleString('en-US', { 
+            
+            const userState = this.userStates.get(chatId);
+            userState.receipt.date = date;
+            userState.state = 'WAITING_FOR_STORE';
+            
+            // 轉換為當地時區顯示
+            const localDate = new Date(date.toLocaleString('en-US', { 
                 timeZone: this.config.TIME_ZONE 
             }));
-
-            const userState = this.userStates.get(chatId);
-            userState.receipt = {
-                date: localDate.toISOString(), // 使用 ISO 格式
-                items: []
-            };
-            userState.state = 'WAITING_FOR_STORE';
-
+            
             await this.bot.sendMessage(
                 chatId, 
                 `日期已設定為：${localDate.toLocaleString('zh-TW', { 
@@ -347,9 +347,20 @@ class BotService {
                 })}\n\n請輸入商店名稱`
             );
         } catch (error) {
+            // 獲取當前時間作為例子
+            const now = new Date();
+            const exampleDate = now.toLocaleString('zh-TW', {
+                timeZone: this.config.TIME_ZONE,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
             await this.bot.sendMessage(
                 chatId, 
-                '❌ 無效的日期格式，請重新輸入（例如：2024-02-14 12:00）'
+                `❌ 無效的日期格式，請重新輸入（例如：${exampleDate}）`
             );
         }
     }
@@ -681,6 +692,17 @@ class BotService {
             }
         });
 
+        // 獲取當前時間作為例子
+        const now = new Date();
+        const exampleDate = now.toLocaleString('zh-TW', {
+            timeZone: this.config.TIME_ZONE,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
         const keyboard = {
             inline_keyboard: [
                 [{ text: '現在時間', callback_data: 'time_now' }]
@@ -689,7 +711,7 @@ class BotService {
 
         await this.bot.sendMessage(
             chatId,
-            '請輸入收據日期時間（例如：2024-02-14 12:00）\n或點擊下方按鈕使用現在時間',
+            `請輸入收據日期時間（例如：${exampleDate}）\n或點擊下方按鈕使用現在時間`,
             { reply_markup: keyboard }
         );
     }
@@ -899,6 +921,39 @@ class BotService {
         await this.bot.sendMessage(
             chatId, 
             customMessage || '❌ 錯誤：' + error.message
+        );
+    }
+
+    async askForDate(chatId) {
+        // 初始化用戶狀態
+        this.userStates.set(chatId, {
+            state: 'WAITING_FOR_DATE',
+            receipt: {
+                items: []
+            }
+        });
+
+        // 獲取當前時間作為例子
+        const now = new Date();
+        const exampleDate = now.toLocaleString('zh-TW', {
+            timeZone: this.config.TIME_ZONE,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '現在時間', callback_data: 'time_now' }]
+            ]
+        };
+
+        await this.bot.sendMessage(
+            chatId,
+            `請輸入收據日期時間（例如：${exampleDate}）\n或點擊下方按鈕使用現在時間`,
+            { reply_markup: keyboard }
         );
     }
 }
