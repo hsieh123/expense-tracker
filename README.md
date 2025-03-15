@@ -8,6 +8,8 @@
 ## 尚需補足的功能
 - /year 報表 recurring expense 只顯示一個月的金額
 - 修改 recurring expense 的選單不見了
+- /add 新增收據的時間跟項目都不錯，需要重新設計
+
 ## 功能
 
 - 📊 日報、週報、月報、年報
