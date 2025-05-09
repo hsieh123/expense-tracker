@@ -7,9 +7,9 @@
 
 ## 尚需補足的功能
 - /year 報表 recurring expense 只顯示一個月的金額
-- 修改 recurring expense 的選單不見了
-- /add 新增收據的時間跟項目都不錯，需要重新設計
-- 3/15/2025 with one manual added and one auto add (7.5) receipt, not showing correctly in /week 
+- ~修改 recurring expense 的選單不見了~ just type /recurring
+- ~/add 新增收據的時間跟項目都錯，需要重新設計~
+- 3/15/2025 with one manual added receipt and one json text added (7.5) receipt, not showing correctly in /week 
 
 ## 功能
 

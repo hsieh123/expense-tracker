@@ -1,6 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
-const { getLocalDateString } = require('../utils/dateUtils');
+const { getLocalDateString, toUTCISOString, fromUTCISOString } = require('../utils/dateUtils');
 const { validateReceipt } = require('../utils/validators');
 const { existsSync } = require('fs');
 
@@ -21,30 +21,17 @@ class StorageService {
     }
 
     getFilePath(date) {
-        // 轉換為當地時區的日期
-        const localDate = new Date(date.toLocaleString('en-US', { 
-            timeZone: this.config.TIME_ZONE 
-        }));
-        
-        console.log('Getting file path for:', {
-            input: date.toISOString(),
-            localDate: localDate.toLocaleString('en-US', { timeZone: this.config.TIME_ZONE }),
-            year: localDate.getFullYear(),
-            month: localDate.getMonth() + 1,
-            day: localDate.getDate()
-        });
-
-        // 使用當地時間的年月日來生成檔案名
+        // Convert to local date for filename
+        const localDate = fromUTCISOString(date.toISOString(), this.config.TIME_ZONE);
         const fileName = `receipts-${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}.json`;
         return path.join(this.dataDir, fileName);
     }
 
     async getReceiptsByDate(date) {
         try {
-            const targetDate = new Date(date);
+            const targetDate = fromUTCISOString(date.toISOString(), this.config.TIME_ZONE);
             console.log('Looking for receipts on date:', targetDate.toISOString());
 
-            // 讀取對應日期的文件
             const fileName = `receipts-${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}.json`;
             const filePath = path.join(this.dataDir, fileName);
 
@@ -57,29 +44,13 @@ class StorageService {
             const receipts = JSON.parse(data);
             console.log('Found receipts in file:', receipts);
 
-            // 簡化日期比較：只比較年月日，忽略時間
+            // Convert all receipt dates to UTC for comparison
             return receipts.filter(receipt => {
-                const receiptDate = new Date(receipt.date);
+                const receiptDate = fromUTCISOString(receipt.date, this.config.TIME_ZONE);
                 const isSameDate = 
                     receiptDate.getFullYear() === targetDate.getFullYear() &&
                     receiptDate.getMonth() === targetDate.getMonth() &&
                     receiptDate.getDate() === targetDate.getDate();
-
-                console.log('Date comparison:', {
-                    receipt: {
-                        date: receiptDate.toISOString(),
-                        year: receiptDate.getFullYear(),
-                        month: receiptDate.getMonth(),
-                        day: receiptDate.getDate()
-                    },
-                    target: {
-                        date: targetDate.toISOString(),
-                        year: targetDate.getFullYear(),
-                        month: targetDate.getMonth(),
-                        day: targetDate.getDate()
-                    },
-                    isSameDate
-                });
 
                 return isSameDate;
             });
@@ -96,17 +67,24 @@ class StorageService {
             }
 
             await this.ensureDataDir();
-            const date = new Date(receipt.date);
+            
+            // Convert receipt date to UTC
+            const receiptWithUTC = {
+                ...receipt,
+                date: toUTCISOString(receipt.date, this.config.TIME_ZONE)
+            };
+            
+            const date = new Date(receiptWithUTC.date);
             const filePath = this.getFilePath(date);
             
             console.log('Saving receipt to:', {
                 date: date.toISOString(),
                 filePath,
-                receipt
+                receipt: receiptWithUTC
             });
 
             let receipts = await this.getReceiptsByDate(date);
-            receipts.push(receipt);
+            receipts.push(receiptWithUTC);
             
             await fs.writeFile(filePath, JSON.stringify(receipts, null, 2));
             return true;
