@@ -11,6 +11,7 @@ class BotService {
         this.bot = new TelegramBot(config.BOT_TOKEN, { polling: true });
         this.userStates = new Map();
         this.deleteStates = new Map();
+        this.messageBuffer = new Map();
         
         this.initializeBot();
         this.setupScheduledTasks();
@@ -56,7 +57,7 @@ class BotService {
 
                 // 嘗試解析為 JSON
                 try {
-                    await this.handleJsonInput(msg.chat.id, msg.text);
+                    await this.handleJsonInput(msg.chat.id, msg.text, msg.date);
                 } catch (error) {
                     // 如果不是有效的 JSON，靜默失敗
                     console.log('非 JSON 格式的訊息:', error.message);
@@ -263,7 +264,7 @@ class BotService {
                     break;
 
                 case 'WAITING_FOR_JSON':
-                    await this.handleJsonInput(chatId, msg.text);
+                    await this.handleJsonInput(chatId, msg.text, msg.date);
                     this.userStates.delete(chatId);
                     break;
             }
@@ -896,66 +897,179 @@ class BotService {
         }
     }
 
-    async handleJsonInput(chatId, text) {
+    async handleJsonInput(chatId, text, messageDate) {
         try {
-            const data = JSON.parse(text);
-            const receipts = Array.isArray(data) ? data : [data];
-            let successCount = 0;
-            let errorCount = 0;
-            
-            for (const receipt of receipts) {
-                try {
-                    // 驗證必要欄位
-                    if (!receipt.date || !receipt.store || !Array.isArray(receipt.items)) {
-                        throw new Error('缺少必要欄位 (date, store, items)');
-                    }
+            // 檢查是否有緩衝的訊息
+            const buffer = this.messageBuffer.get(chatId) || { messages: [], lastUpdate: 0, processing: false };
+            const now = Math.floor(Date.now() / 1000); // Convert to seconds
 
-                    // 驗證日期格式
-                    const date = new Date(receipt.date);
-                    if (isNaN(date)) {
-                        throw new Error('無效的日期格式');
-                    }
-
-                    // 驗證項目
-                    if (receipt.items.length === 0) {
-                        throw new Error('至少需要一個項目');
-                    }
-
-                    for (const item of receipt.items) {
-                        if (!item.name || typeof item.price !== 'number' || !item.category) {
-                            throw new Error('項目格式錯誤 (需要 name, price, category)');
-                        }
-                    }
-
-                    // 計算總金額
-                    receipt.amount = Number(receipt.items.reduce((sum, item) => sum + item.price, 0).toFixed(2));
-
-                    // 儲存收據
-                    const result = await this.storage.saveReceipt(receipt);
-                    if (result === true) {
-                        successCount++;
-                    } else {
-                        errorCount++;
-                        console.error('儲存收據失敗:', result.error);
-                    }
-                } catch (error) {
-                    errorCount++;
-                    console.error('處理收據時發生錯誤:', error);
-                }
+            // 如果正在處理中，直接返回
+            if (buffer.processing) {
+                return;
             }
 
-            // 發送結果訊息
-            if (successCount > 0) {
-                await this.bot.sendMessage(chatId, `✅ 成功儲存 ${successCount} 筆收據${errorCount > 0 ? `，${errorCount} 筆失敗` : ''}`);
-            } else {
-                await this.bot.sendMessage(chatId, '❌ 所有收據儲存失敗');
+            // 如果最後一次更新超過 5 秒，清空緩衝
+            if (now - buffer.lastUpdate > 5) {
+                buffer.messages = [];
+            }
+
+            // 添加新訊息到緩衝
+            buffer.messages.push(text);
+            buffer.lastUpdate = messageDate || now;
+            this.messageBuffer.set(chatId, buffer);
+
+            // 等待 1 秒看是否有更多訊息
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // 檢查緩衝是否已更新
+            const currentBuffer = this.messageBuffer.get(chatId);
+            if (!currentBuffer || currentBuffer.lastUpdate > buffer.lastUpdate) {
+                // 有新訊息加入或緩衝已被清空，等待處理
+                return;
+            }
+
+            // 標記為處理中
+            buffer.processing = true;
+            this.messageBuffer.set(chatId, buffer);
+
+            try {
+                // 合併所有訊息
+                const combinedText = buffer.messages.join('');
+                
+                // 嘗試解析 JSON
+                let data;
+                try {
+                    data = JSON.parse(combinedText);
+                } catch (parseError) {
+                    // 如果解析失敗，嘗試修復常見的 JSON 分割問題
+                    const fixedText = this.fixSplitJson(combinedText);
+                    if (fixedText) {
+                        try {
+                            data = JSON.parse(fixedText);
+                        } catch (secondParseError) {
+                            throw new Error('無效的 JSON 格式');
+                        }
+                    } else {
+                        throw new Error('無效的 JSON 格式');
+                    }
+                }
+
+                // 確保我們只處理一次
+                const receipts = Array.isArray(data) ? data : [data];
+                const processedReceipts = new Set(); // 用於追蹤已處理的收據
+                let successCount = 0;
+                let errorCount = 0;
+                
+                for (const receipt of receipts) {
+                    try {
+                        // 生成收據的唯一識別碼
+                        const receiptId = `${receipt.date}_${receipt.store}_${receipt.items.map(item => 
+                            `${item.name}_${item.price}_${item.category}`).join('_')}`;
+
+                        // 如果已經處理過這個收據，跳過
+                        if (processedReceipts.has(receiptId)) {
+                            continue;
+                        }
+                        processedReceipts.add(receiptId);
+
+                        // 驗證必要欄位
+                        if (!receipt.date || !receipt.store || !Array.isArray(receipt.items)) {
+                            throw new Error('缺少必要欄位 (date, store, items)');
+                        }
+
+                        // 驗證日期格式
+                        const date = new Date(receipt.date);
+                        if (isNaN(date)) {
+                            throw new Error('無效的日期格式');
+                        }
+
+                        // 驗證項目
+                        if (receipt.items.length === 0) {
+                            throw new Error('至少需要一個項目');
+                        }
+
+                        for (const item of receipt.items) {
+                            if (!item.name || typeof item.price !== 'number' || !item.category) {
+                                throw new Error('項目格式錯誤 (需要 name, price, category)');
+                            }
+                        }
+
+                        // 計算總金額
+                        receipt.amount = Number(receipt.items.reduce((sum, item) => sum + item.price, 0).toFixed(2));
+
+                        // 儲存收據
+                        const result = await this.storage.saveReceipt(receipt);
+                        if (result === true) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                            console.error('儲存收據失敗:', result.error);
+                        }
+                    } catch (error) {
+                        errorCount++;
+                        console.error('處理收據時發生錯誤:', error);
+                    }
+                }
+
+                // 發送結果訊息
+                if (successCount > 0) {
+                    await this.bot.sendMessage(chatId, `✅ 成功儲存 ${successCount} 筆收據${errorCount > 0 ? `，${errorCount} 筆失敗` : ''}`);
+                } else {
+                    await this.bot.sendMessage(chatId, '❌ 所有收據儲存失敗');
+                }
+            } finally {
+                // 清空緩衝並重置處理狀態
+                this.messageBuffer.delete(chatId);
             }
         } catch (error) {
+            // 清空緩衝並重置處理狀態
+            this.messageBuffer.delete(chatId);
+            
             if (error instanceof SyntaxError) {
                 throw new Error('無效的 JSON 格式');
             }
             throw error;
         }
+    }
+
+    /**
+     * 修復被分割的 JSON 字串
+     * @private
+     */
+    fixSplitJson(text) {
+        // 移除所有空白字符
+        text = text.replace(/\s+/g, '');
+        
+        // 檢查是否缺少開頭的 [
+        if (!text.startsWith('[')) {
+            text = '[' + text;
+        }
+        
+        // 檢查是否缺少結尾的 ]
+        if (!text.endsWith(']')) {
+            text = text + ']';
+        }
+
+        // 修復被分割的物件
+        text = text.replace(/}\s*{/g, '},{');
+        
+        // 修復被分割的陣列
+        text = text.replace(/]\s*\[/g, '],[');
+        
+        // 修復被分割的字串
+        text = text.replace(/"\s*"/g, '""');
+        
+        // 修復被分割的數字
+        text = text.replace(/(\d+)\s*\.\s*(\d+)/g, '$1.$2');
+        
+        // 修復被分割的布林值
+        text = text.replace(/true\s*true/g, 'true');
+        text = text.replace(/false\s*false/g, 'false');
+        
+        // 修復被分割的 null
+        text = text.replace(/null\s*null/g, 'null');
+
+        return text;
     }
 
     async handleError(chatId, error, customMessage = null) {
