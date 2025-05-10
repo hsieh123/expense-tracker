@@ -1,6 +1,5 @@
 services:
   bot:
-    platform: linux/amd64
     build: .
     volumes:
       - ./data:/usr/src/app/data

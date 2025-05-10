@@ -176,7 +176,8 @@ class BotService {
                     break;
                 case '/json':
                     await this.bot.sendMessage(chatId, 
-                        '請輸入 JSON 格式的收據資料，格式如下：\n' +
+                        '請輸入 JSON 格式的收據資料，可以是單筆收據或收據陣列：\n\n' +
+                        '單筆收據格式：\n' +
                         '{\n' +
                         '  "date": "2024-02-14T12:00:00",\n' +
                         '  "store": "商店名稱",\n' +
@@ -187,7 +188,32 @@ class BotService {
                         '      "category": "GROCERIES"\n' +
                         '    }\n' +
                         '  ]\n' +
-                        '}'
+                        '}\n\n' +
+                        '收據陣列格式：\n' +
+                        '[\n' +
+                        '  {\n' +
+                        '    "date": "2024-02-14T12:00:00",\n' +
+                        '    "store": "商店名稱",\n' +
+                        '    "items": [\n' +
+                        '      {\n' +
+                        '        "name": "商品名稱",\n' +
+                        '        "price": 100,\n' +
+                        '        "category": "GROCERIES"\n' +
+                        '      }\n' +
+                        '    ]\n' +
+                        '  },\n' +
+                        '  {\n' +
+                        '    "date": "2024-02-14T13:00:00",\n' +
+                        '    "store": "另一家商店",\n' +
+                        '    "items": [\n' +
+                        '      {\n' +
+                        '        "name": "其他商品",\n' +
+                        '        "price": 200,\n' +
+                        '        "category": "DINING"\n' +
+                        '      }\n' +
+                        '    ]\n' +
+                        '  }\n' +
+                        ']'
                     );
                     this.userStates.set(chatId, { state: 'WAITING_FOR_JSON' });
                     break;
@@ -753,10 +779,10 @@ class BotService {
         
         try {
             // 計算總金額
-            userState.receipt.amount = userState.receipt.items.reduce(
+            userState.receipt.amount = Number(userState.receipt.items.reduce(
                 (sum, item) => sum + item.price, 
                 0
-            );
+            ).toFixed(2));
 
             // 驗證必要欄位
             if (!userState.receipt.date || 
@@ -872,43 +898,59 @@ class BotService {
 
     async handleJsonInput(chatId, text) {
         try {
-            const receipt = JSON.parse(text);
+            const data = JSON.parse(text);
+            const receipts = Array.isArray(data) ? data : [data];
+            let successCount = 0;
+            let errorCount = 0;
             
-            // 驗證必要欄位
-            if (!receipt.date || !receipt.store || !Array.isArray(receipt.items)) {
-                throw new Error('缺少必要欄位 (date, store, items)');
-            }
+            for (const receipt of receipts) {
+                try {
+                    // 驗證必要欄位
+                    if (!receipt.date || !receipt.store || !Array.isArray(receipt.items)) {
+                        throw new Error('缺少必要欄位 (date, store, items)');
+                    }
 
-            // 驗證日期格式
-            const date = new Date(receipt.date);
-            if (isNaN(date)) {
-                throw new Error('無效的日期格式');
-            }
+                    // 驗證日期格式
+                    const date = new Date(receipt.date);
+                    if (isNaN(date)) {
+                        throw new Error('無效的日期格式');
+                    }
 
-            // 驗證項目
-            if (receipt.items.length === 0) {
-                throw new Error('至少需要一個項目');
-            }
+                    // 驗證項目
+                    if (receipt.items.length === 0) {
+                        throw new Error('至少需要一個項目');
+                    }
 
-            for (const item of receipt.items) {
-                if (!item.name || typeof item.price !== 'number' || !item.category) {
-                    throw new Error('項目格式錯誤 (需要 name, price, category)');
+                    for (const item of receipt.items) {
+                        if (!item.name || typeof item.price !== 'number' || !item.category) {
+                            throw new Error('項目格式錯誤 (需要 name, price, category)');
+                        }
+                    }
+
+                    // 計算總金額
+                    receipt.amount = Number(receipt.items.reduce((sum, item) => sum + item.price, 0).toFixed(2));
+
+                    // 儲存收據
+                    const result = await this.storage.saveReceipt(receipt);
+                    if (result === true) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error('儲存收據失敗:', result.error);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.error('處理收據時發生錯誤:', error);
                 }
             }
 
-            // 計算總金額
-            receipt.amount = receipt.items.reduce((sum, item) => sum + item.price, 0);
-
-            // 儲存收據
-            const result = await this.storage.saveReceipt(receipt);
-            if (result === true) {
-                await this.bot.sendMessage(chatId, '✅ 收據已儲存！');
+            // 發送結果訊息
+            if (successCount > 0) {
+                await this.bot.sendMessage(chatId, `✅ 成功儲存 ${successCount} 筆收據${errorCount > 0 ? `，${errorCount} 筆失敗` : ''}`);
             } else {
-                await this.bot.sendMessage(chatId, '❌ 儲存失敗：' + result.error);
+                await this.bot.sendMessage(chatId, '❌ 所有收據儲存失敗');
             }
         } catch (error) {
-            // 如果是在 initializeBot 中調用，我們會捕獲這個錯誤並靜默失敗
-            // 如果是在其他地方調用（比如 /json 命令），我們會顯示錯誤訊息
             if (error instanceof SyntaxError) {
                 throw new Error('無效的 JSON 格式');
             }
